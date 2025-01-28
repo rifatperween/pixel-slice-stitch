@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Loader2, Upload, Lock, Unlock, Grid, Layers } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from "./ui/alert";
 
 interface ProcessingState {
   isUploading: boolean;
@@ -17,6 +18,7 @@ const ImageProcessor = () => {
   const [key, setKey] = useState<string>('');
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
+  const [statusMessage, setStatusMessage] = useState<string>('');
   const [processing, setProcessing] = useState<ProcessingState>({
     isUploading: false,
     isSegmenting: false,
@@ -36,17 +38,20 @@ const ImageProcessor = () => {
     });
 
     setProcessing(prev => ({ ...prev, isUploading: true }));
+    setStatusMessage('Uploading image...');
     try {
       const reader = new FileReader();
       reader.onload = () => {
         console.log('File read complete. Image converted to base64');
         setImage(reader.result as string);
         toast.success('Image uploaded successfully');
+        setStatusMessage('');
       };
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Error uploading image');
+      setStatusMessage('Upload failed');
     } finally {
       setProcessing(prev => ({ ...prev, isUploading: false }));
     }
@@ -75,30 +80,36 @@ const ImageProcessor = () => {
     try {
       // Simulating segmentation
       setProcessing(prev => ({ ...prev, isSegmenting: true }));
+      setStatusMessage('Step 1: Segmenting image into ' + (rows * cols) + ' parts');
       console.log('Step 1: Segmenting image into', rows * cols, 'parts');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Simulating encryption
       setProcessing(prev => ({ ...prev, isSegmenting: false, isEncrypting: true }));
+      setStatusMessage('Step 2: Encrypting segments with provided key');
       console.log('Step 2: Encrypting segments with provided key');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Simulating decryption
       setProcessing(prev => ({ ...prev, isEncrypting: false, isDecrypting: true }));
+      setStatusMessage('Step 3: Decrypting segments');
       console.log('Step 3: Decrypting segments');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Simulating stitching
       setProcessing(prev => ({ ...prev, isDecrypting: false, isStitching: true }));
+      setStatusMessage('Step 4: Stitching segments back together');
       console.log('Step 4: Stitching segments back together');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setProcessedImage(image);
       console.log('Processing complete: Image successfully processed');
       toast.success('Image processed successfully');
+      setStatusMessage('Processing complete!');
     } catch (error) {
       console.error('Processing error:', error);
       toast.error('Error processing image');
+      setStatusMessage('Processing failed');
     } finally {
       setProcessing({
         isUploading: false,
@@ -113,6 +124,12 @@ const ImageProcessor = () => {
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold text-center mb-8">Image Processor</h1>
+      
+      {statusMessage && (
+        <Alert className="mb-4">
+          <AlertDescription>{statusMessage}</AlertDescription>
+        </Alert>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Upload Section */}
