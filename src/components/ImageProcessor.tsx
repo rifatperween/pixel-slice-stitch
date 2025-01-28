@@ -4,6 +4,7 @@ import { Loader2, Upload, Lock, Unlock, Grid, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from "./ui/alert";
 import { uploadImage, processImage, ProcessingOptions } from '@/services/imageProcessingService';
+import { supabase } from '@/lib/supabase';
 
 interface ProcessingState {
   isUploading: boolean;
@@ -116,6 +117,15 @@ const ImageProcessor = () => {
       setProcessing(prev => ({ ...prev, isUploading: false }));
     }
   }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png']
+    },
+    maxFiles: 1
+  });
 
   const processImageWithBackend = async () => {
     if (!image) {
