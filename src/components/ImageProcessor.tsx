@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Loader2, Upload, Lock, Unlock, Grid, Layers } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,13 +12,22 @@ interface ProcessingState {
   isStitching: boolean;
 }
 
+interface ImageSegment {
+  data: string;
+  index: number;
+  encrypted?: boolean;
+  decrypted?: boolean;
+}
+
 const ImageProcessor = () => {
   const [image, setImage] = useState<string | null>(null);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [segments, setSegments] = useState<ImageSegment[]>([]);
   const [key, setKey] = useState<string>('');
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
   const [statusMessage, setStatusMessage] = useState<string>('');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [processing, setProcessing] = useState<ProcessingState>({
     isUploading: false,
     isSegmenting: false,
@@ -26,6 +35,55 @@ const ImageProcessor = () => {
     isDecrypting: false,
     isStitching: false,
   });
+
+  const segmentImage = async (imageUrl: string): Promise<ImageSegment[]> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const segmentWidth = img.width / cols;
+        const segmentHeight = img.height / rows;
+        const segments: ImageSegment[] = [];
+
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            const segCanvas = document.createElement('canvas');
+            const segCtx = segCanvas.getContext('2d');
+            if (!segCtx) continue;
+
+            segCanvas.width = segmentWidth;
+            segCanvas.height = segmentHeight;
+
+            segCtx.drawImage(
+              img,
+              j * segmentWidth,
+              i * segmentHeight,
+              segmentWidth,
+              segmentHeight,
+              0,
+              0,
+              segmentWidth,
+              segmentHeight
+            );
+
+            segments.push({
+              data: segCanvas.toDataURL(),
+              index: i * cols + j,
+            });
+          }
+        }
+        resolve(segments);
+      };
+      img.src = imageUrl;
+    });
+  };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -71,39 +129,40 @@ const ImageProcessor = () => {
       return;
     }
 
-    console.log('Starting image processing with parameters:', {
-      gridSize: `${rows}x${cols}`,
-      totalSegments: rows * cols,
-      keyLength: key.length
-    });
-
     try {
-      // Simulating segmentation
+      // Segmentation
       setProcessing(prev => ({ ...prev, isSegmenting: true }));
       setStatusMessage('Step 1: Segmenting image into ' + (rows * cols) + ' parts');
-      console.log('Step 1: Segmenting image into', rows * cols, 'parts');
+      const imageSegments = await segmentImage(image);
+      setSegments(imageSegments);
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Simulating encryption
+      // Encryption
       setProcessing(prev => ({ ...prev, isSegmenting: false, isEncrypting: true }));
       setStatusMessage('Step 2: Encrypting segments with provided key');
-      console.log('Step 2: Encrypting segments with provided key');
+      const encryptedSegments = imageSegments.map(seg => ({
+        ...seg,
+        encrypted: true
+      }));
+      setSegments(encryptedSegments);
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Simulating decryption
+      // Decryption
       setProcessing(prev => ({ ...prev, isEncrypting: false, isDecrypting: true }));
       setStatusMessage('Step 3: Decrypting segments');
-      console.log('Step 3: Decrypting segments');
+      const decryptedSegments = encryptedSegments.map(seg => ({
+        ...seg,
+        decrypted: true
+      }));
+      setSegments(decryptedSegments);
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Simulating stitching
+      // Stitching
       setProcessing(prev => ({ ...prev, isDecrypting: false, isStitching: true }));
       setStatusMessage('Step 4: Stitching segments back together');
-      console.log('Step 4: Stitching segments back together');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setProcessedImage(image);
-      console.log('Processing complete: Image successfully processed');
       toast.success('Image processed successfully');
       setStatusMessage('Processing complete!');
     } catch (error) {
@@ -231,6 +290,41 @@ const ImageProcessor = () => {
               </div>
             )}
           </div>
+
+          {/* Segments Display */}
+          {segments.length > 0 && (
+            <div className="border rounded-lg p-4">
+              <h3 className="font-medium mb-4">Image Segments</h3>
+              <div 
+                className="grid gap-2" 
+                style={{ 
+                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                  gridTemplateRows: `repeat(${rows}, 1fr)`
+                }}
+              >
+                {segments.map((segment, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`relative border rounded-md overflow-hidden
+                      ${segment.encrypted ? 'bg-red-100' : ''}
+                      ${segment.decrypted ? 'bg-green-100' : ''}
+                    `}
+                  >
+                    <img 
+                      src={segment.data} 
+                      alt={`Segment ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {segment.encrypted && !segment.decrypted && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Lock className="text-white h-6 w-6" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="border rounded-lg p-4">
             <h3 className="font-medium mb-4">Processed Image</h3>
