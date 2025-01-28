@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { Loader2, Upload, Lock, Unlock, Grid, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from "./ui/alert";
+import { uploadImage, processImage, ProcessingOptions } from '@/services/imageProcessingService';
 
 interface ProcessingState {
   isUploading: boolean;
@@ -97,15 +98,16 @@ const ImageProcessor = () => {
 
     setProcessing(prev => ({ ...prev, isUploading: true }));
     setStatusMessage('Uploading image...');
+    
     try {
-      const reader = new FileReader();
-      reader.onload = () => {
-        console.log('File read complete. Image converted to base64');
-        setImage(reader.result as string);
-        toast.success('Image uploaded successfully');
-        setStatusMessage('');
-      };
-      reader.readAsDataURL(file);
+      const uploadResult = await uploadImage(file);
+      const imageUrl = supabase.storage
+        .from('images')
+        .getPublicUrl(uploadResult.path).data.publicUrl;
+      
+      setImage(imageUrl);
+      toast.success('Image uploaded successfully');
+      setStatusMessage('');
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Error uploading image');
@@ -115,54 +117,27 @@ const ImageProcessor = () => {
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png'],
-    },
-    multiple: false,
-  });
-
-  const processImage = async () => {
+  const processImageWithBackend = async () => {
     if (!image) {
       toast.error('Please upload an image first');
       return;
     }
 
     try {
-      // Segmentation
       setProcessing(prev => ({ ...prev, isSegmenting: true }));
-      setStatusMessage('Step 1: Segmenting image into ' + (rows * cols) + ' parts');
-      const imageSegments = await segmentImage(image);
-      setSegments(imageSegments);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setStatusMessage('Processing image with advanced algorithms...');
+
+      const options: ProcessingOptions = {
+        rows,
+        cols,
+        key,
+      };
+
+      const result = await processImage(image, options);
       
-      // Encryption
-      setProcessing(prev => ({ ...prev, isSegmenting: false, isEncrypting: true }));
-      setStatusMessage('Step 2: Encrypting segments with provided key');
-      const encryptedSegments = imageSegments.map(seg => ({
-        ...seg,
-        encrypted: true
-      }));
-      setSegments(encryptedSegments);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setProcessedImage(result.processedImageUrl);
+      setSegments(result.segments);
       
-      // Decryption
-      setProcessing(prev => ({ ...prev, isEncrypting: false, isDecrypting: true }));
-      setStatusMessage('Step 3: Decrypting segments');
-      const decryptedSegments = encryptedSegments.map(seg => ({
-        ...seg,
-        decrypted: true
-      }));
-      setSegments(decryptedSegments);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Stitching
-      setProcessing(prev => ({ ...prev, isDecrypting: false, isStitching: true }));
-      setStatusMessage('Step 4: Stitching segments back together');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setProcessedImage(image);
       toast.success('Image processed successfully');
       setStatusMessage('Processing complete!');
     } catch (error) {
@@ -245,7 +220,7 @@ const ImageProcessor = () => {
             </div>
 
             <button
-              onClick={processImage}
+              onClick={processImageWithBackend}
               disabled={!image || Object.values(processing).some(Boolean)}
               className="w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
