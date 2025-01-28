@@ -29,17 +29,24 @@ const ImageProcessor = () => {
     const file = acceptedFiles[0];
     if (!file) return;
 
+    console.log('Starting upload process:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    });
+
     setProcessing(prev => ({ ...prev, isUploading: true }));
     try {
       const reader = new FileReader();
       reader.onload = () => {
+        console.log('File read complete. Image converted to base64');
         setImage(reader.result as string);
         toast.success('Image uploaded successfully');
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      toast.error('Error uploading image');
       console.error('Upload error:', error);
+      toast.error('Error uploading image');
     } finally {
       setProcessing(prev => ({ ...prev, isUploading: false }));
     }
@@ -59,23 +66,39 @@ const ImageProcessor = () => {
       return;
     }
 
+    console.log('Starting image processing with parameters:', {
+      gridSize: `${rows}x${cols}`,
+      totalSegments: rows * cols,
+      keyLength: key.length
+    });
+
     try {
-      // Simulating processing steps with delays
+      // Simulating segmentation
       setProcessing(prev => ({ ...prev, isSegmenting: true }));
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProcessing(prev => ({ ...prev, isSegmenting: false, isEncrypting: true }));
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProcessing(prev => ({ ...prev, isEncrypting: false, isDecrypting: true }));
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProcessing(prev => ({ ...prev, isDecrypting: false, isStitching: true }));
+      console.log('Step 1: Segmenting image into', rows * cols, 'parts');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // For demo, just setting the same image as processed
+      // Simulating encryption
+      setProcessing(prev => ({ ...prev, isSegmenting: false, isEncrypting: true }));
+      console.log('Step 2: Encrypting segments with provided key');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simulating decryption
+      setProcessing(prev => ({ ...prev, isEncrypting: false, isDecrypting: true }));
+      console.log('Step 3: Decrypting segments');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simulating stitching
+      setProcessing(prev => ({ ...prev, isDecrypting: false, isStitching: true }));
+      console.log('Step 4: Stitching segments back together');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       setProcessedImage(image);
+      console.log('Processing complete: Image successfully processed');
       toast.success('Image processed successfully');
     } catch (error) {
-      toast.error('Error processing image');
       console.error('Processing error:', error);
+      toast.error('Error processing image');
     } finally {
       setProcessing({
         isUploading: false,
@@ -126,7 +149,7 @@ const ImageProcessor = () => {
                 <input
                   type="number"
                   value={rows}
-                  onChange={(e) => setRows(parseInt(e.target.value))}
+                  onChange={(e) => setRows(parseInt(e.target.value) || 1)}
                   min={1}
                   max={10}
                   className="w-full p-2 border rounded-md"
@@ -137,7 +160,7 @@ const ImageProcessor = () => {
                 <input
                   type="number"
                   value={cols}
-                  onChange={(e) => setCols(parseInt(e.target.value))}
+                  onChange={(e) => setCols(parseInt(e.target.value) || 1)}
                   min={1}
                   max={10}
                   className="w-full p-2 border rounded-md"
