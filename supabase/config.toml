@@ -1,1 +1,2 @@
-project_id = "ecpwjkishkowkyjyheij"
+[functions.process-image]
+verify_jwt = false
